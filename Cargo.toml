@@ -3,4 +3,7 @@ name = "janus-echotest"
 version = "0.1.0"
 authors = ["Aleksey Ivanov <ialexxei@gmail.com>"]
 
+[lib]
+crate-type = ["rlib", "cdylib"]
+
 [dependencies]
