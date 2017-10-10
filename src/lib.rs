@@ -1,6 +1,6 @@
 mod janus;
 
-use janus::{Plugin, Callback, Session, PluginResult, json_t};
+use janus::{Plugin, Callback, PluginSession, PluginResult, json_t};
 use std::os::raw::{c_int, c_char};
 
 const ECHOTEST_VERSION: u8 = 1;
@@ -87,11 +87,11 @@ extern "C" fn janus_echotest_destroy() {
     println!("RUST janus_echotest_destroy!!!");
 }
 
-extern "C" fn janus_echotest_create_session(handle: *mut Session, error: *mut c_int) {
+extern "C" fn janus_echotest_create_session(handle: *mut PluginSession, error: *mut c_int) {
     println!("RUST janus_echotest_create_session!!!");
 }
 
-extern "C" fn janus_echotest_query_session(handle: *mut Session) -> *mut json_t {
+extern "C" fn janus_echotest_query_session(handle: *mut PluginSession) -> *mut json_t {
     println!("RUST janus_echotest_query_session!!!");
     let json = json_t {
         type_: janus::json_type::JSON_NULL,
@@ -101,12 +101,12 @@ extern "C" fn janus_echotest_query_session(handle: *mut Session) -> *mut json_t 
     Box::into_raw(Box::new(json))
 }
 
-extern "C" fn janus_echotest_destroy_session(handle: *mut Session, error: *mut c_int) {
+extern "C" fn janus_echotest_destroy_session(handle: *mut PluginSession, error: *mut c_int) {
     println!("RUST janus_echotest_destroy_session!!!");
 }
 
 extern "C" fn janus_echotest_handle_message(
-    handle: *mut Session,
+    handle: *mut PluginSession,
     transaction: *mut c_char,
     message: *mut json_t,
     jsep: *mut json_t,
@@ -128,10 +128,10 @@ extern "C" fn janus_echotest_handle_message(
     Box::into_raw(Box::new(result))
 }
 
-extern "C" fn janus_echotest_setup_media(handle: *mut Session) {
+extern "C" fn janus_echotest_setup_media(handle: *mut PluginSession) {
     println!("RUST janus_echotest_setup_media!!!");
 }
 
-extern "C" fn janus_echotest_hangup_media(handle: *mut Session) {
+extern "C" fn janus_echotest_hangup_media(handle: *mut PluginSession) {
     println!("RUST janus_echotest_hangup_media!!!");
 }
