@@ -39,92 +39,99 @@ pub extern "C" fn create() -> *mut Plugin {
 
 // Meta
 extern "C" fn janus_echotest_get_api_compatibility() -> c_int {
-    println!("janus_echotest_get_api_compatibility!!!");
+    println!("RUST janus_echotest_get_api_compatibility!!!");
     janus::JANUS_PLUGIN_API_VERSION as c_int
 }
 
 extern "C" fn janus_echotest_get_version() -> c_int {
-    println!("janus_echotest_get_version!!!");
+    println!("RUST janus_echotest_get_version!!!");
     ECHOTEST_VERSION as c_int
 }
 
 extern "C" fn janus_echotest_get_version_string() -> *const c_char {
-    println!("janus_echotest_get_version_string!!!");
-    std::ffi::CString::new(ECHOTEST_VERSION_STRING).unwrap().into_raw()
+    println!("RUST janus_echotest_get_version_string!!!");
+    std::ffi::CString::new(ECHOTEST_VERSION_STRING)
+        .unwrap()
+        .into_raw()
 }
 
 extern "C" fn janus_echotest_get_description() -> *const c_char {
-    println!("janus_echotest_get_description!!!");
-    std::ffi::CString::new(ECHOTEST_DESCRIPTION).unwrap().into_raw()
+    println!("RUST janus_echotest_get_description!!!");
+    std::ffi::CString::new(ECHOTEST_DESCRIPTION)
+        .unwrap()
+        .into_raw()
 }
 
 extern "C" fn janus_echotest_get_name() -> *const c_char {
-    println!("janus_echotest_get_name!!!");
+    println!("RUST janus_echotest_get_name!!!");
     std::ffi::CString::new(ECHOTEST_NAME).unwrap().into_raw()
 }
 
 extern "C" fn janus_echotest_get_author() -> *const c_char {
-    println!("janus_echotest_get_author!!!");
+    println!("RUST janus_echotest_get_author!!!");
     std::ffi::CString::new(ECHOTEST_AUTHOR).unwrap().into_raw()
 }
 
 extern "C" fn janus_echotest_get_package() -> *const c_char {
-    println!("janus_echotest_get_package!!!");
+    println!("RUST janus_echotest_get_package!!!");
     std::ffi::CString::new(ECHOTEST_PACKAGE).unwrap().into_raw()
 }
 // End Meta
 
 extern "C" fn janus_echotest_init(callback: *mut Callback, config_path: *const c_char) -> c_int {
-    println!("janus_echotest_init!!!");
+    println!("RUST janus_echotest_init!!!");
     0
 }
 
 extern "C" fn janus_echotest_destroy() {
-    println!("janus_echotest_destroy!!!");
+    println!("RUST janus_echotest_destroy!!!");
 }
 
 extern "C" fn janus_echotest_create_session(handle: *mut Session, error: *mut c_int) {
-    println!("janus_echotest_create_session!!!");
+    println!("RUST janus_echotest_create_session!!!");
 }
 
 extern "C" fn janus_echotest_query_session(handle: *mut Session) -> *mut json_t {
-    println!("janus_echotest_query_session!!!");
+    println!("RUST janus_echotest_query_session!!!");
     let json = json_t {
         type_: janus::json_type::JSON_NULL,
-        refcount: 0
+        refcount: 0,
     };
 
     Box::into_raw(Box::new(json))
 }
 
 extern "C" fn janus_echotest_destroy_session(handle: *mut Session, error: *mut c_int) {
-    println!("janus_echotest_destroy_session!!!");
+    println!("RUST janus_echotest_destroy_session!!!");
 }
 
 extern "C" fn janus_echotest_handle_message(
-    handle: *mut Session, transaction: *mut c_char, message: *mut json_t, jsep: *mut json_t)
-    -> *mut PluginResult {
+    handle: *mut Session,
+    transaction: *mut c_char,
+    message: *mut json_t,
+    jsep: *mut json_t,
+) -> *mut PluginResult {
 
-    println!("janus_echotest_handle_message!!!");
+    println!("RUST janus_echotest_handle_message!!!");
 
     let mut json = json_t {
         type_: janus::json_type::JSON_NULL,
-        refcount: 0
+        refcount: 0,
     };
 
     let result = PluginResult {
         type_: janus::janus_plugin_result_type::JANUS_PLUGIN_OK,
         text: std::ffi::CString::new("text").unwrap().into_raw(),
-        content: &mut json
+        content: &mut json,
     };
 
     Box::into_raw(Box::new(result))
 }
 
 extern "C" fn janus_echotest_setup_media(handle: *mut Session) {
-    println!("janus_echotest_setup_media!!!");
+    println!("RUST janus_echotest_setup_media!!!");
 }
 
 extern "C" fn janus_echotest_hangup_media(handle: *mut Session) {
-    println!("janus_echotest_hangup_media!!!");
+    println!("RUST janus_echotest_hangup_media!!!");
 }
