@@ -201,7 +201,18 @@ extern "C" fn janus_echotest_incoming_rtp(
     buf: *mut c_char,
     len: c_int,
 ) {
-    println!("RUST janus_echotest_incoming_rtp!!!");
+    // println!("RUST janus_echotest_incoming_rtp!!!");
+    // println!("RUST video: {:?}", video);
+    // Fails with IntoStringError
+    // println!("RUST buf: {:?}", unsafe { CString::from_raw(buf).into_string().unwrap() });
+    // println!("RUST len: {:?}", len);
+
+    let gateway = acquire_gateway().unwrap();
+    let relay_fn = gateway.relay_rtp.unwrap();
+
+    unsafe {
+        relay_fn(handle, video, buf, len);
+    }
 }
 
 extern "C" fn janus_echotest_incoming_rtcp(
@@ -210,7 +221,11 @@ extern "C" fn janus_echotest_incoming_rtcp(
     buf: *mut c_char,
     len: c_int,
 ) {
-    println!("RUST janus_echotest_incoming_rtcp!!!");
+    // println!("RUST janus_echotest_incoming_rtcp!!!");
+    // println!("RUST video: {:?}", video);
+    // Fails with IntoStringError
+    // println!("RUST buf: {:?}", unsafe { CString::from_raw(buf).into_string().unwrap() });
+    // println!("RUST len: {:?}", len);
 }
 
 extern "C" {
@@ -303,8 +318,8 @@ fn janus_echotest_handler() {
 }
 
 fn acquire_gateway() -> Option<Callback> {
-    println!("RUST acquiring gateway lock");
+    // println!("RUST acquiring gateway lock");
     let rx = GATEWAY.lock().unwrap();
-    println!("RUST acquired gateway lock");
+    // println!("RUST acquired gateway lock");
     *rx
 }
