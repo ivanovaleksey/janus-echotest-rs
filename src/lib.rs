@@ -14,8 +14,6 @@ lazy_static! {
         (Mutex::new(tx), Mutex::new(rx))
     };
 
-    static ref GATEWAY: Mutex<Option<Callback>> = Mutex::new(None);
-
     static ref ECHO_PLUGIN: Plugin = Plugin {
         init: Some(janus_echotest_init),
         destroy: Some(janus_echotest_destroy),
@@ -37,6 +35,8 @@ lazy_static! {
         ..Default::default()
     };
 }
+
+static mut GATEWAY: Option<Callback> = None;
 
 const ECHOTEST_VERSION: u8 = 1;
 const ECHOTEST_VERSION_STRING: &'static str = "0.1";
@@ -110,8 +110,7 @@ extern "C" fn janus_echotest_init(callback: *mut Callback, config_path: *const c
     std::thread::spawn(|| { janus_echotest_handler(); });
 
     let callback = unsafe { *callback };
-    let mut gateway = GATEWAY.lock().unwrap();
-    *gateway = Some(callback);
+    unsafe { GATEWAY = Some(callback); }
 
     0
 }
@@ -312,8 +311,5 @@ fn janus_echotest_handler() {
 }
 
 fn acquire_gateway() -> Option<Callback> {
-    // println!("RUST acquiring gateway lock");
-    let rx = GATEWAY.lock().unwrap();
-    // println!("RUST acquired gateway lock");
-    *rx
+    unsafe { GATEWAY }
 }
