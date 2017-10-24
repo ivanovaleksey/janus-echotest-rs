@@ -9,10 +9,7 @@ use std::sync::{Mutex, mpsc};
 use std::ffi::CString;
 
 lazy_static! {
-    static ref CHANNELS: (Mutex<mpsc::Sender<Message>>, Mutex<mpsc::Receiver<Message>>) = {
-        let (tx, rx) = mpsc::channel();
-        (Mutex::new(tx), Mutex::new(rx))
-    };
+    static ref CHANNEL: Mutex<Option<mpsc::Sender<Message>>> = Mutex::new(None);
 }
 
 static mut GATEWAY: Option<Callback> = None;
@@ -108,7 +105,11 @@ extern "C" fn janus_echotest_get_package() -> *const c_char {
 
 extern "C" fn janus_echotest_init(callback: *mut Callback, config_path: *const c_char) -> c_int {
     println!("RUST janus_echotest_init!!!");
-    std::thread::spawn(|| { janus_echotest_handler(); });
+
+    let (tx, rx) = mpsc::channel();
+    *(CHANNEL.lock().unwrap()) = Some(tx);
+
+    std::thread::spawn(move || { janus_echotest_handler(rx); });
 
     let callback = unsafe { *callback };
     unsafe { GATEWAY = Some(callback); }
@@ -153,7 +154,8 @@ extern "C" fn janus_echotest_handle_message(
     println!("RUST janus_echotest_handle_message!!!");
 
     println!("RUST acquiring transfer lock");
-    let tx = &CHANNELS.0.lock().unwrap();
+    let mutex = CHANNEL.lock().unwrap();
+    let tx = mutex.as_ref().unwrap();
     println!("RUST acquired transfer lock");
 
     let handle = unsafe { *handle };
@@ -238,15 +240,10 @@ extern "C" {
     fn janus_sdp_generate_answer(offer: *mut janus::janus_sdp, ...) -> *mut janus::janus_sdp;
 }
 
-fn janus_echotest_handler() {
+fn janus_echotest_handler(rx: mpsc::Receiver<Message>) {
     println!("starting to handle");
 
-    loop {
-        println!("RUST acquiring receiver lock");
-        let rx = &CHANNELS.1.lock().unwrap();
-        println!("RUST acquired receiver lock");
-
-        let received = rx.recv().unwrap();
+    for received in rx.iter() {
         println!("RUST janus_echotest_handler, received: {:?}", received);
 
         if received.jsep.is_null() {
