@@ -13,11 +13,31 @@ lazy_static! {
         let (tx, rx) = mpsc::channel();
         (Mutex::new(tx), Mutex::new(rx))
     };
-
-    static ref GATEWAY: Mutex<Option<Callback>> = Mutex::new(None);
-
-    static ref ECHO_PLUGIN: Mutex<Plugin> = Mutex::new(Plugin::default());
 }
+
+static mut GATEWAY: Option<Callback> = None;
+
+const ECHO_PLUGIN: Plugin = Plugin {
+    init: Some(janus_echotest_init),
+    destroy: Some(janus_echotest_destroy),
+    get_api_compatibility: Some(janus_echotest_get_api_compatibility),
+    get_version: Some(janus_echotest_get_version),
+    get_version_string: Some(janus_echotest_get_version_string),
+    get_description: Some(janus_echotest_get_description),
+    get_name: Some(janus_echotest_get_name),
+    get_author: Some(janus_echotest_get_author),
+    get_package: Some(janus_echotest_get_package),
+    create_session: Some(janus_echotest_create_session),
+    handle_message: Some(janus_echotest_handle_message),
+    setup_media: Some(janus_echotest_setup_media),
+    incoming_rtp: Some(janus_echotest_incoming_rtp),
+    incoming_rtcp: Some(janus_echotest_incoming_rtcp),
+    incoming_data: None,
+    slow_link: None,
+    hangup_media: Some(janus_echotest_hangup_media),
+    destroy_session: Some(janus_echotest_destroy_session),
+    query_session: Some(janus_echotest_query_session),
+};
 
 const ECHOTEST_VERSION: u8 = 1;
 const ECHOTEST_VERSION_STRING: &'static str = "0.1";
@@ -42,32 +62,7 @@ struct EchoTestSession {
 
 #[no_mangle]
 pub extern "C" fn create() -> *mut Plugin {
-    let plugin = Plugin {
-        init: Some(janus_echotest_init),
-        destroy: Some(janus_echotest_destroy),
-        get_api_compatibility: Some(janus_echotest_get_api_compatibility),
-        get_version: Some(janus_echotest_get_version),
-        get_version_string: Some(janus_echotest_get_version_string),
-        get_description: Some(janus_echotest_get_description),
-        get_name: Some(janus_echotest_get_name),
-        get_author: Some(janus_echotest_get_author),
-        get_package: Some(janus_echotest_get_package),
-        create_session: Some(janus_echotest_create_session),
-        handle_message: Some(janus_echotest_handle_message),
-        setup_media: Some(janus_echotest_setup_media),
-        incoming_rtp: Some(janus_echotest_incoming_rtp),
-        incoming_rtcp: Some(janus_echotest_incoming_rtcp),
-        incoming_data: None,
-        slow_link: None,
-        hangup_media: Some(janus_echotest_hangup_media),
-        destroy_session: Some(janus_echotest_destroy_session),
-        query_session: Some(janus_echotest_query_session),
-    };
-
-    let mut global_plugin = ECHO_PLUGIN.lock().unwrap();
-    *global_plugin = plugin;
-
-    Box::into_raw(Box::new(*global_plugin))
+    Box::into_raw(Box::new(ECHO_PLUGIN))
 }
 
 // Meta
@@ -116,8 +111,7 @@ extern "C" fn janus_echotest_init(callback: *mut Callback, config_path: *const c
     std::thread::spawn(|| { janus_echotest_handler(); });
 
     let callback = unsafe { *callback };
-    let mut gateway = GATEWAY.lock().unwrap();
-    *gateway = Some(callback);
+    unsafe { GATEWAY = Some(callback); }
 
     0
 }
@@ -290,8 +284,7 @@ fn janus_echotest_handler() {
         println!("RUST gateway: {:?}", gateway);
 
         let push_event = gateway.push_event.unwrap();
-        let plugin = *ECHO_PLUGIN.lock().unwrap();
-        println!("RUST plugin: {:?}", plugin);
+        println!("RUST plugin: {:?}", ECHO_PLUGIN);
 
         let res: c_int = unsafe {
             let transaction = CString::new(received.transaction).unwrap().into_raw();
@@ -310,7 +303,7 @@ fn janus_echotest_handler() {
                 sdp
             );
 
-            push_event(&received.handle as *const _ as *mut _, &plugin as *const _ as *mut _, transaction, event, jsep)
+            push_event(&received.handle as *const _ as *mut _, &ECHO_PLUGIN as *const _ as *mut _, transaction, event, jsep)
         };
 
         println!("  >> Pushed event: {}", res);
@@ -318,8 +311,5 @@ fn janus_echotest_handler() {
 }
 
 fn acquire_gateway() -> Option<Callback> {
-    // println!("RUST acquiring gateway lock");
-    let rx = GATEWAY.lock().unwrap();
-    // println!("RUST acquired gateway lock");
-    *rx
+    unsafe { GATEWAY }
 }

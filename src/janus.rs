@@ -7,6 +7,7 @@ pub type Plugin = janus_plugin;
 pub type PluginResult = janus_plugin_result;
 pub type PluginSession = janus_plugin_session;
 
+// It could be #[derive(Default)] but it would require to edit bindings file manually
 impl Default for Plugin {
     fn default() -> Plugin {
         Plugin {
