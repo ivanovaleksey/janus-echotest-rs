@@ -8,3 +8,4 @@ crate-type = ["rlib", "cdylib"]
 
 [dependencies]
 lazy_static = "*"
+janus-plugin = "0.2.0"
