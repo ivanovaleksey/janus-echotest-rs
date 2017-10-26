@@ -1,54 +1,33 @@
 #[macro_use]
+extern crate cstr_macro;
+#[macro_use]
+extern crate janus_plugin;
+#[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate serde_derive;
+#[macro_use]
+extern crate serde_json;
 
-mod janus;
-
-use janus::{Plugin, Callback, PluginSession, PluginResult, json_t};
 use std::os::raw::{c_int, c_char, c_void};
 use std::sync::{Mutex, mpsc};
 use std::ffi::CString;
+use janus_plugin::{PluginCallbacks, PluginSession, RawPluginResult, PluginResult, PluginResultType,
+    RawJanssonValue, JanssonValue};
+use janus_plugin::sdp;
 
 lazy_static! {
     static ref CHANNEL: Mutex<Option<mpsc::Sender<Message>>> = Mutex::new(None);
 }
 
-static mut GATEWAY: Option<Callback> = None;
-
-const ECHO_PLUGIN: Plugin = Plugin {
-    init: Some(janus_echotest_init),
-    destroy: Some(janus_echotest_destroy),
-    get_api_compatibility: Some(janus_echotest_get_api_compatibility),
-    get_version: Some(janus_echotest_get_version),
-    get_version_string: Some(janus_echotest_get_version_string),
-    get_description: Some(janus_echotest_get_description),
-    get_name: Some(janus_echotest_get_name),
-    get_author: Some(janus_echotest_get_author),
-    get_package: Some(janus_echotest_get_package),
-    create_session: Some(janus_echotest_create_session),
-    handle_message: Some(janus_echotest_handle_message),
-    setup_media: Some(janus_echotest_setup_media),
-    incoming_rtp: Some(janus_echotest_incoming_rtp),
-    incoming_rtcp: Some(janus_echotest_incoming_rtcp),
-    incoming_data: None,
-    slow_link: None,
-    hangup_media: Some(janus_echotest_hangup_media),
-    destroy_session: Some(janus_echotest_destroy_session),
-    query_session: Some(janus_echotest_query_session),
-};
-
-const ECHOTEST_VERSION: u8 = 1;
-const ECHOTEST_VERSION_STRING: &'static str = "0.1";
-const ECHOTEST_DESCRIPTION: &'static str = "EchoTest plugin description";
-const ECHOTEST_NAME: &'static str = "EchoTest plugin";
-const ECHOTEST_AUTHOR: &'static str = "John";
-const ECHOTEST_PACKAGE: &'static str = "janus.plugin.echotest";
+static mut GATEWAY: Option<&PluginCallbacks> = None;
 
 #[derive(Debug)]
 struct Message {
-    handle: PluginSession,
-    transaction: String,
-    message: *mut json_t,
-    jsep: *mut json_t,
+    handle: *mut PluginSession,
+    transaction: *mut c_char,
+    message: Option<JanssonValue>,
+    jsep: Option<JanssonValue>,
 }
 unsafe impl std::marker::Send for Message {}
 
@@ -57,71 +36,43 @@ struct EchoTestSession {
     field: u8,
 }
 
-#[no_mangle]
-pub extern "C" fn create() -> *mut Plugin {
-    Box::into_raw(Box::new(ECHO_PLUGIN))
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase", tag = "type")]
+pub enum JsepKind {
+    Offer { sdp: String },
+    Answer { sdp: String },
 }
 
-// Meta
-extern "C" fn janus_echotest_get_api_compatibility() -> c_int {
-    println!("RUST janus_echotest_get_api_compatibility!!!");
-    janus::JANUS_PLUGIN_API_VERSION as c_int
-}
+const METADATA: janus_plugin::PluginMetadata = janus_plugin::PluginMetadata {
+    version: 1,
+    version_str: cstr!("0.1"),
+    description: cstr!("EchoTest plugin"),
+    name: cstr!("EchoTest plugin"),
+    author: cstr!("Aleksey Ivanov"),
+    package: cstr!("janus.plugin.echotest"),
+};
 
-extern "C" fn janus_echotest_get_version() -> c_int {
-    println!("RUST janus_echotest_get_version!!!");
-    ECHOTEST_VERSION as c_int
-}
-
-extern "C" fn janus_echotest_get_version_string() -> *const c_char {
-    println!("RUST janus_echotest_get_version_string!!!");
-    CString::new(ECHOTEST_VERSION_STRING)
-        .unwrap()
-        .into_raw()
-}
-
-extern "C" fn janus_echotest_get_description() -> *const c_char {
-    println!("RUST janus_echotest_get_description!!!");
-    CString::new(ECHOTEST_DESCRIPTION)
-        .unwrap()
-        .into_raw()
-}
-
-extern "C" fn janus_echotest_get_name() -> *const c_char {
-    println!("RUST janus_echotest_get_name!!!");
-    CString::new(ECHOTEST_NAME).unwrap().into_raw()
-}
-
-extern "C" fn janus_echotest_get_author() -> *const c_char {
-    println!("RUST janus_echotest_get_author!!!");
-    CString::new(ECHOTEST_AUTHOR).unwrap().into_raw()
-}
-
-extern "C" fn janus_echotest_get_package() -> *const c_char {
-    println!("RUST janus_echotest_get_package!!!");
-    CString::new(ECHOTEST_PACKAGE).unwrap().into_raw()
-}
-// End Meta
-
-extern "C" fn janus_echotest_init(callback: *mut Callback, config_path: *const c_char) -> c_int {
+extern "C" fn init(callback: *mut PluginCallbacks, config_path: *const c_char) -> c_int {
     println!("RUST janus_echotest_init!!!");
+
+    unsafe {
+        let callback = callback.as_ref().unwrap();
+        GATEWAY = Some(callback);
+    }
 
     let (tx, rx) = mpsc::channel();
     *(CHANNEL.lock().unwrap()) = Some(tx);
 
     std::thread::spawn(move || { janus_echotest_handler(rx); });
 
-    let callback = unsafe { *callback };
-    unsafe { GATEWAY = Some(callback); }
-
     0
 }
 
-extern "C" fn janus_echotest_destroy() {
+extern "C" fn destroy() {
     println!("RUST janus_echotest_destroy!!!");
 }
 
-extern "C" fn janus_echotest_create_session(handle: *mut PluginSession, error: *mut c_int) {
+extern "C" fn create_session(handle: *mut PluginSession, error: *mut c_int) {
     println!("RUST janus_echotest_create_session!!!");
 
     let handle = unsafe { &mut *handle };
@@ -130,26 +81,21 @@ extern "C" fn janus_echotest_create_session(handle: *mut PluginSession, error: *
     handle.plugin_handle = &mut session as *mut EchoTestSession as *mut c_void;
 }
 
-extern "C" fn janus_echotest_query_session(handle: *mut PluginSession) -> *mut json_t {
+extern "C" fn query_session(handle: *mut PluginSession) -> *mut RawJanssonValue {
     println!("RUST janus_echotest_query_session!!!");
-    let json = json_t {
-        type_: janus::json_type::JSON_NULL,
-        refcount: 0,
-    };
-
-    Box::into_raw(Box::new(json))
+    std::ptr::null_mut()
 }
 
-extern "C" fn janus_echotest_destroy_session(handle: *mut PluginSession, error: *mut c_int) {
+extern "C" fn destroy_session(handle: *mut PluginSession, error: *mut c_int) {
     println!("RUST janus_echotest_destroy_session!!!");
 }
 
-extern "C" fn janus_echotest_handle_message(
+extern "C" fn handle_message(
     handle: *mut PluginSession,
     transaction: *mut c_char,
-    message: *mut json_t,
-    jsep: *mut json_t,
-) -> *mut PluginResult {
+    message: *mut RawJanssonValue,
+    jsep: *mut RawJanssonValue,
+) -> *mut RawPluginResult {
 
     println!("RUST janus_echotest_handle_message!!!");
 
@@ -158,12 +104,8 @@ extern "C" fn janus_echotest_handle_message(
     let tx = mutex.as_ref().unwrap();
     println!("RUST acquired transfer lock");
 
-    let handle = unsafe { *handle };
-    let transaction = unsafe {
-        CString::from_raw(transaction)
-            .into_string()
-            .unwrap()
-    };
+    let message = unsafe { JanssonValue::new(message) };
+    let jsep = unsafe { JanssonValue::new(jsep) };
 
     let echo_message = Message {
         handle: handle,
@@ -172,26 +114,21 @@ extern "C" fn janus_echotest_handle_message(
         jsep: jsep,
     };
     println!("RUST sending");
-    tx.send(echo_message);
+    tx.send(echo_message).expect("Sending to channel has failed");
 
-    unsafe {
-        janus::janus_plugin_result_new(
-            janus::janus_plugin_result_type::JANUS_PLUGIN_OK_WAIT,
-            CString::new("Rust string").unwrap().into_raw(),
-            std::ptr::null_mut::<json_t>(),
-        )
-    }
+    let result = PluginResult::new(PluginResultType::JANUS_PLUGIN_OK_WAIT, cstr!("Rust string"), None);
+    result.into_raw()
 }
 
-extern "C" fn janus_echotest_setup_media(handle: *mut PluginSession) {
+extern "C" fn setup_media(handle: *mut PluginSession) {
     println!("RUST janus_echotest_setup_media!!!");
 }
 
-extern "C" fn janus_echotest_hangup_media(handle: *mut PluginSession) {
+extern "C" fn hangup_media(handle: *mut PluginSession) {
     println!("RUST janus_echotest_hangup_media!!!");
 }
 
-extern "C" fn janus_echotest_incoming_rtp(
+extern "C" fn incoming_rtp(
     handle: *mut PluginSession,
     video: c_int,
     buf: *mut c_char,
@@ -203,15 +140,11 @@ extern "C" fn janus_echotest_incoming_rtp(
     // println!("RUST buf: {:?}", unsafe { CString::from_raw(buf).into_string().unwrap() });
     // println!("RUST len: {:?}", len);
 
-    let gateway = acquire_gateway().unwrap();
-    let relay_fn = gateway.relay_rtp.unwrap();
-
-    unsafe {
-        relay_fn(handle, video, buf, len);
-    }
+    let relay_fn = acquire_gateway().relay_rtp;
+    relay_fn(handle, video, buf, len);
 }
 
-extern "C" fn janus_echotest_incoming_rtcp(
+extern "C" fn incoming_rtcp(
     handle: *mut PluginSession,
     video: c_int,
     buf: *mut c_char,
@@ -224,21 +157,9 @@ extern "C" fn janus_echotest_incoming_rtcp(
     // println!("RUST len: {:?}", len);
 }
 
-extern "C" {
-    fn json_object() -> *mut json_t;
-    fn json_object_get(object: *const json_t, key: *const c_char) -> *mut json_t;
-    fn json_object_set_new(object: *mut json_t, key: *const c_char, value: *mut json_t) -> c_int;
+extern "C" fn incoming_data(handle: *mut PluginSession, buf: *mut c_char, len: c_int) {}
 
-    fn json_string(value: *const c_char) -> *mut json_t;
-    fn json_string_value(string: *const json_t) -> *const c_char;
-
-    fn json_pack(fmt: *const c_char, ...) -> *mut json_t;
-}
-
-extern "C" {
-    fn janus_sdp_parse(sdp: *const c_char, error: *mut c_char, errlen: usize) -> *mut janus::janus_sdp;
-    fn janus_sdp_generate_answer(offer: *mut janus::janus_sdp, ...) -> *mut janus::janus_sdp;
-}
+extern "C" fn slow_link(handle: *mut PluginSession, uplink: c_int, video: c_int) {}
 
 fn janus_echotest_handler(rx: mpsc::Receiver<Message>) {
     println!("starting to handle");
@@ -246,67 +167,62 @@ fn janus_echotest_handler(rx: mpsc::Receiver<Message>) {
     for received in rx.iter() {
         println!("RUST janus_echotest_handler, received: {:?}", received);
 
-        if received.jsep.is_null() {
+        if received.jsep.is_none() {
             println!("RUST janus_echotest_handler, jsep is NONE, skipping");
             continue;
         }
 
-        let sdp =  unsafe {
-            let jsep = received.jsep;
-            let key = CString::new("sdp").unwrap().into_raw();
-            let json_object = json_object_get(jsep, key);
-            let c_string = json_string_value(json_object);
+        let jsep: JanssonValue = received.jsep.unwrap();
+        let jsep_string: String = jsep.to_string(janus_plugin::JanssonEncodingFlags::empty());
+        let jsep_json: JsepKind = serde_json::from_str(&jsep_string).unwrap();
+        println!("jsep: {:?}", jsep_json);
 
-            CString::from_raw(c_string as *mut _)
+        let answer: serde_json::Value = match jsep_json {
+            JsepKind::Offer { sdp } => {
+                let offer: sdp::Sdp = sdp::Sdp::parse(CString::new(sdp).unwrap()).unwrap();
+                println!("offer: {:?}", offer);
+
+                let answer: sdp::Sdp = answer_sdp!(offer);
+                println!("answer: {:?}", answer);
+
+                let answer_str = answer.to_string();
+                let sdp = answer_str.to_str().unwrap().to_owned();
+
+                serde_json::to_value(JsepKind::Answer { sdp }).unwrap()
+            }
+            JsepKind::Answer { .. } => panic!("Only offers are allowed"),
         };
 
-        println!("sdp: {:?}", sdp);
+        let event_json = json!({ "result": "ok" });
+        let event_serde: JanssonValue = JanssonValue::from_str(&event_json.to_string(), janus_plugin::JanssonDecodingFlags::empty()).unwrap();
+        let event: *mut RawJanssonValue = event_serde.as_mut_ref();
 
-        let offer: janus::janus_sdp = unsafe {
-            let bytes = vec![0u8; 512];
-            let c_string = CString::from_vec_unchecked(bytes);
+        let jsep_serde: JanssonValue = JanssonValue::from_str(&answer.to_string(), janus_plugin::JanssonDecodingFlags::empty()).unwrap();
+        let jsep: *mut RawJanssonValue = jsep_serde.as_mut_ref();
 
-            let offer_prt: *mut janus::janus_sdp = janus_sdp_parse(sdp.into_raw(), c_string.into_raw(), 512);
-            *offer_prt
-        };
-        println!("offer: {:?}", offer);
-
-        let answer: janus::janus_sdp = unsafe {
-            let answer_ptr: *mut janus::janus_sdp = janus_sdp_generate_answer(&offer as *const _ as *mut _, janus::JANUS_SDP_OA_DONE);
-            *answer_ptr
-        };
-        println!("answer: {:?}", answer);
-
-        let gateway = acquire_gateway().unwrap();
-        println!("RUST gateway: {:?}", gateway);
-
-        let push_event = gateway.push_event.unwrap();
-        println!("RUST plugin: {:?}", ECHO_PLUGIN);
-
-        let res: c_int = unsafe {
-            let transaction = CString::new(received.transaction).unwrap().into_raw();
-
-            let event = json_object();
-            json_object_set_new(event, CString::new("echotest").unwrap().into_raw(), json_string(CString::new("event").unwrap().into_raw()));
-            json_object_set_new(event, CString::new("result").unwrap().into_raw(), json_string(CString::new("ok").unwrap().into_raw()));
-
-            let sdp_type = CString::new("answer").unwrap().into_raw();
-            let sdp = janus::janus_sdp_write(&answer as *const _ as *mut _);
-            let jsep = json_pack(
-                CString::new("{ssss}").unwrap().into_raw(),
-                CString::new("type").unwrap().into_raw(),
-                sdp_type,
-                CString::new("sdp").unwrap().into_raw(),
-                sdp
-            );
-
-            push_event(&received.handle as *const _ as *mut _, &ECHO_PLUGIN as *const _ as *mut _, transaction, event, jsep)
-        };
-
-        println!("  >> Pushed event: {}", res);
+        let push_event_fn = acquire_gateway().push_event;
+        janus_plugin::get_result(push_event_fn(received.handle, &mut PLUGIN, received.transaction, event, jsep)).expect("Pushing event has failed");
     }
 }
 
-fn acquire_gateway() -> Option<Callback> {
-    unsafe { GATEWAY }
+fn acquire_gateway() -> &'static PluginCallbacks {
+    unsafe { GATEWAY }.expect("Gateway is NONE")
 }
+
+const PLUGIN: janus_plugin::Plugin = build_plugin!(
+    METADATA,
+    init,
+    destroy,
+    create_session,
+    handle_message,
+    setup_media,
+    incoming_rtp,
+    incoming_rtcp,
+    incoming_data,
+    slow_link,
+    hangup_media,
+    destroy_session,
+    query_session
+);
+
+export_plugin!(&PLUGIN);
