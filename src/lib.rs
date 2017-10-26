@@ -53,7 +53,7 @@ const METADATA: janus_plugin::PluginMetadata = janus_plugin::PluginMetadata {
 };
 
 extern "C" fn init(callback: *mut PluginCallbacks, config_path: *const c_char) -> c_int {
-    println!("RUST janus_echotest_init!!!");
+    janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_init!!!");
 
     unsafe {
         let callback = callback.as_ref().unwrap();
@@ -69,11 +69,11 @@ extern "C" fn init(callback: *mut PluginCallbacks, config_path: *const c_char) -
 }
 
 extern "C" fn destroy() {
-    println!("RUST janus_echotest_destroy!!!");
+    janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_destroy!!!");
 }
 
 extern "C" fn create_session(handle: *mut PluginSession, error: *mut c_int) {
-    println!("RUST janus_echotest_create_session!!!");
+    janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_create_session!!!");
 
     let handle = unsafe { &mut *handle };
     let mut session = EchoTestSession { field: 1 };
@@ -82,12 +82,12 @@ extern "C" fn create_session(handle: *mut PluginSession, error: *mut c_int) {
 }
 
 extern "C" fn query_session(handle: *mut PluginSession) -> *mut RawJanssonValue {
-    println!("RUST janus_echotest_query_session!!!");
+    janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_query_session!!!");
     std::ptr::null_mut()
 }
 
 extern "C" fn destroy_session(handle: *mut PluginSession, error: *mut c_int) {
-    println!("RUST janus_echotest_destroy_session!!!");
+    janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_destroy_session!!!");
 }
 
 extern "C" fn handle_message(
@@ -97,12 +97,12 @@ extern "C" fn handle_message(
     jsep: *mut RawJanssonValue,
 ) -> *mut RawPluginResult {
 
-    println!("RUST janus_echotest_handle_message!!!");
+    janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_handle_message!!!");
 
-    println!("RUST acquiring transfer lock");
+    janus_plugin::log(janus_plugin::LogLevel::Verb, "--> acquiring transfer lock");
     let mutex = CHANNEL.lock().unwrap();
     let tx = mutex.as_ref().unwrap();
-    println!("RUST acquired transfer lock");
+    janus_plugin::log(janus_plugin::LogLevel::Verb, "--> acquired transfer lock");
 
     let message = unsafe { JanssonValue::new(message) };
     let jsep = unsafe { JanssonValue::new(jsep) };
@@ -113,7 +113,7 @@ extern "C" fn handle_message(
         message: message,
         jsep: jsep,
     };
-    println!("RUST sending");
+    janus_plugin::log(janus_plugin::LogLevel::Verb, "--> sending message to channel");
     tx.send(echo_message).expect("Sending to channel has failed");
 
     let result = PluginResult::new(PluginResultType::JANUS_PLUGIN_OK_WAIT, cstr!("Rust string"), None);
@@ -121,11 +121,11 @@ extern "C" fn handle_message(
 }
 
 extern "C" fn setup_media(handle: *mut PluginSession) {
-    println!("RUST janus_echotest_setup_media!!!");
+    janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_setup_media!!!");
 }
 
 extern "C" fn hangup_media(handle: *mut PluginSession) {
-    println!("RUST janus_echotest_hangup_media!!!");
+    janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_hangup_media!!!");
 }
 
 extern "C" fn incoming_rtp(
@@ -134,12 +134,6 @@ extern "C" fn incoming_rtp(
     buf: *mut c_char,
     len: c_int,
 ) {
-    // println!("RUST janus_echotest_incoming_rtp!!!");
-    // println!("RUST video: {:?}", video);
-    // Fails with IntoStringError
-    // println!("RUST buf: {:?}", unsafe { CString::from_raw(buf).into_string().unwrap() });
-    // println!("RUST len: {:?}", len);
-
     let relay_fn = acquire_gateway().relay_rtp;
     relay_fn(handle, video, buf, len);
 }
@@ -149,41 +143,35 @@ extern "C" fn incoming_rtcp(
     video: c_int,
     buf: *mut c_char,
     len: c_int,
-) {
-    // println!("RUST janus_echotest_incoming_rtcp!!!");
-    // println!("RUST video: {:?}", video);
-    // Fails with IntoStringError
-    // println!("RUST buf: {:?}", unsafe { CString::from_raw(buf).into_string().unwrap() });
-    // println!("RUST len: {:?}", len);
-}
+) {}
 
 extern "C" fn incoming_data(handle: *mut PluginSession, buf: *mut c_char, len: c_int) {}
 
 extern "C" fn slow_link(handle: *mut PluginSession, uplink: c_int, video: c_int) {}
 
 fn janus_echotest_handler(rx: mpsc::Receiver<Message>) {
-    println!("starting to handle");
+    janus_plugin::log(janus_plugin::LogLevel::Verb, "Start handling thread");
 
     for received in rx.iter() {
-        println!("RUST janus_echotest_handler, received: {:?}", received);
+        janus_plugin::log(janus_plugin::LogLevel::Verb, &format!("--> janus_echotest_handler, received: {:?}", received));
 
         if received.jsep.is_none() {
-            println!("RUST janus_echotest_handler, jsep is NONE, skipping");
+            janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_handler, jsep is NONE, skipping");
             continue;
         }
 
         let jsep: JanssonValue = received.jsep.unwrap();
         let jsep_string: String = jsep.to_string(janus_plugin::JanssonEncodingFlags::empty());
         let jsep_json: JsepKind = serde_json::from_str(&jsep_string).unwrap();
-        println!("jsep: {:?}", jsep_json);
+        janus_plugin::log(janus_plugin::LogLevel::Verb, &format!("--> janus_echotest_handler, jsep: {:?}", jsep_json));
 
         let answer: serde_json::Value = match jsep_json {
             JsepKind::Offer { sdp } => {
                 let offer: sdp::Sdp = sdp::Sdp::parse(CString::new(sdp).unwrap()).unwrap();
-                println!("offer: {:?}", offer);
+                janus_plugin::log(janus_plugin::LogLevel::Verb, &format!("--> janus_echotest_handler, offer: {:?}", offer));
 
                 let answer: sdp::Sdp = answer_sdp!(offer);
-                println!("answer: {:?}", answer);
+                janus_plugin::log(janus_plugin::LogLevel::Verb, &format!("--> janus_echotest_handler, answer: {:?}", answer));
 
                 let answer_str = answer.to_string();
                 let sdp = answer_str.to_str().unwrap().to_owned();
