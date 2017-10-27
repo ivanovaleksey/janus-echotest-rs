@@ -52,7 +52,7 @@ const METADATA: janus_plugin::PluginMetadata = janus_plugin::PluginMetadata {
     package: cstr!("janus.plugin.echotest"),
 };
 
-extern "C" fn init(callback: *mut PluginCallbacks, config_path: *const c_char) -> c_int {
+extern "C" fn init(callback: *mut PluginCallbacks, _config_path: *const c_char) -> c_int {
     janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_init!!!");
 
     unsafe {
@@ -72,7 +72,7 @@ extern "C" fn destroy() {
     janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_destroy!!!");
 }
 
-extern "C" fn create_session(handle: *mut PluginSession, error: *mut c_int) {
+extern "C" fn create_session(handle: *mut PluginSession, _error: *mut c_int) {
     janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_create_session!!!");
 
     let handle = unsafe { &mut *handle };
@@ -81,12 +81,12 @@ extern "C" fn create_session(handle: *mut PluginSession, error: *mut c_int) {
     handle.plugin_handle = &mut session as *mut EchoTestSession as *mut c_void;
 }
 
-extern "C" fn query_session(handle: *mut PluginSession) -> *mut RawJanssonValue {
+extern "C" fn query_session(_handle: *mut PluginSession) -> *mut RawJanssonValue {
     janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_query_session!!!");
     std::ptr::null_mut()
 }
 
-extern "C" fn destroy_session(handle: *mut PluginSession, error: *mut c_int) {
+extern "C" fn destroy_session(_handle: *mut PluginSession, _error: *mut c_int) {
     janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_destroy_session!!!");
 }
 
@@ -120,11 +120,11 @@ extern "C" fn handle_message(
     result.into_raw()
 }
 
-extern "C" fn setup_media(handle: *mut PluginSession) {
+extern "C" fn setup_media(_handle: *mut PluginSession) {
     janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_setup_media!!!");
 }
 
-extern "C" fn hangup_media(handle: *mut PluginSession) {
+extern "C" fn hangup_media(_handle: *mut PluginSession) {
     janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_hangup_media!!!");
 }
 
@@ -139,15 +139,15 @@ extern "C" fn incoming_rtp(
 }
 
 extern "C" fn incoming_rtcp(
-    handle: *mut PluginSession,
-    video: c_int,
-    buf: *mut c_char,
-    len: c_int,
+    _handle: *mut PluginSession,
+    _video: c_int,
+    _buf: *mut c_char,
+    _len: c_int,
 ) {}
 
-extern "C" fn incoming_data(handle: *mut PluginSession, buf: *mut c_char, len: c_int) {}
+extern "C" fn incoming_data(_handle: *mut PluginSession, _buf: *mut c_char, _len: c_int) {}
 
-extern "C" fn slow_link(handle: *mut PluginSession, uplink: c_int, video: c_int) {}
+extern "C" fn slow_link(_handle: *mut PluginSession, _uplink: c_int, _video: c_int) {}
 
 fn janus_echotest_handler(rx: mpsc::Receiver<Message>) {
     janus_plugin::log(janus_plugin::LogLevel::Verb, "Start handling thread");
