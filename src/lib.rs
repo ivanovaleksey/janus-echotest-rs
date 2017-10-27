@@ -190,7 +190,7 @@ fn janus_echotest_handler(rx: mpsc::Receiver<Message>) {
 
                 serde_json::to_value(JsepKind::Answer { sdp }).unwrap()
             }
-            JsepKind::Answer { .. } => panic!("Only offers are allowed"),
+            JsepKind::Answer { .. } => unreachable!(),
         };
 
         let event_json = json!({ "result": "ok" });
