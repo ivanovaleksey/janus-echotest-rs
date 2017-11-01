@@ -8,8 +8,9 @@ DOCKER_RUN_OPTIONS=${DOCKER_RUN_OPTIONS:-'-ti --rm'}
 
 read -r DOCKER_RUN_COMMAND <<-EOF
     source ~/.profile \
+    && ln -s /opt/janus/bin/janus /usr/local/bin/janus \
     && service nginx start \
-    && /opt/janus/bin/janus
+    && janus
 EOF
 
 docker build -t ${DOCKER_CONTAINER_NAME} docker/
