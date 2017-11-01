@@ -8,7 +8,7 @@ function _link_rust_plugin {
   ln -sf "$SRC_DIR/target/debug/libjanus_echotest.so" "$JANUS_PLUGIN_DIR/libjanus_echotest.so"
 }
 function _sync_local_registry {
-  cargo local-registry --quiet --sync Cargo.lock target/registry
+  cargo local-registry --sync Cargo.lock target/registry
 }
 
 alias link_c_plugin=_link_c_plugin
