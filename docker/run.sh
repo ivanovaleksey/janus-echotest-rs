@@ -13,9 +13,11 @@ read -r DOCKER_RUN_COMMAND <<-EOF
     && janus
 EOF
 
+docker volume create janus-echotest-rs-cargo
 docker build -t ${DOCKER_CONTAINER_NAME} docker/
 docker run ${DOCKER_RUN_OPTIONS} \
     -v $(pwd):${PROJECT_DIR} \
+    -v janus-echotest-rs-cargo:/root/.cargo \
     -p 8443:8443 \
     -p 8089:8089 \
     -p 5002:5002/udp \
