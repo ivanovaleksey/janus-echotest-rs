@@ -115,12 +115,4 @@ RUN set -xe \
     && chmod +x rustup.sh \
     && ./rustup.sh -y
 
-RUN set -xe \
-    && cd /tmp \
-    && curl -fsSL -o cargo-local-registry.tar.gz "https://github.com/alexcrichton/cargo-local-registry/releases/download/0.1.5/cargo-local-registry-0.1.5-x86_64-unknown-linux-musl.tar.gz" \
-    && mkdir cargo-local-registry \
-    && tar -xf cargo-local-registry.tar.gz -C cargo-local-registry --strip-components=1 \
-    && cp cargo-local-registry/cargo-local-registry /root/.cargo/bin/cargo-local-registry
-
 COPY bash_aliases /root/.bash_aliases
-COPY cargo_config /root/.cargo/config
