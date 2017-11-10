@@ -10,7 +10,7 @@ extern crate serde_derive;
 extern crate serde_json;
 
 use std::os::raw::{c_int, c_char, c_void};
-use std::sync::{Mutex, mpsc};
+use std::sync::{Mutex, RwLock, mpsc};
 use std::ffi::CString;
 use janus_plugin::{PluginCallbacks, PluginSession, RawPluginResult, PluginResult,
                    PluginResultType, RawJanssonValue, JanssonValue};
@@ -18,6 +18,7 @@ use janus_plugin::sdp;
 
 lazy_static! {
     static ref CHANNEL: Mutex<Option<mpsc::Sender<Message>>> = Mutex::new(None);
+    static ref SESSIONS: RwLock<Vec<Box<EchoTestSession>>> = RwLock::new(Vec::new());
 }
 
 static mut GATEWAY: Option<&PluginCallbacks> = None;
@@ -82,9 +83,10 @@ extern "C" fn create_session(handle: *mut PluginSession, _error: *mut c_int) {
     );
 
     let handle = unsafe { &mut *handle };
-    let mut session = EchoTestSession { field: 1 };
+    let mut session = Box::new(EchoTestSession { field: 11 });
 
-    handle.plugin_handle = &mut session as *mut EchoTestSession as *mut c_void;
+    handle.plugin_handle = session.as_mut() as *mut EchoTestSession as *mut c_void;
+    SESSIONS.write().unwrap().push(session);
 }
 
 extern "C" fn query_session(_handle: *mut PluginSession) -> *mut RawJanssonValue {
@@ -113,6 +115,11 @@ extern "C" fn handle_message(
         janus_plugin::LogLevel::Verb,
         "--> janus_echotest_handle_message!!!",
     );
+
+    let _session: &EchoTestSession = unsafe {
+        let handle_ref = handle.as_ref().unwrap();
+        (handle_ref.plugin_handle as *mut EchoTestSession).as_ref()
+    }.unwrap();
 
     janus_plugin::log(janus_plugin::LogLevel::Verb, "--> acquiring transfer lock");
     let mutex = CHANNEL.lock().unwrap();
