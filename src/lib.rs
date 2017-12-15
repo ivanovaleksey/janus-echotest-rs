@@ -1,6 +1,4 @@
 #[macro_use]
-extern crate cstr_macro;
-#[macro_use]
 extern crate janus_plugin;
 #[macro_use]
 extern crate lazy_static;
@@ -9,12 +7,20 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
-use janus_plugin::{JanssonValue, PluginCallbacks, PluginResult, PluginResultType, PluginSession,
-                   RawJanssonValue, RawPluginResult};
+use janus_plugin::{JanssonValue, PluginCallbacks, PluginResult, PluginSession, RawJanssonValue,
+                   RawPluginResult};
 use janus_plugin::sdp;
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use std::sync::{mpsc, Mutex, RwLock};
+
+macro_rules! c_str {
+    ($lit:expr) => {
+        unsafe {
+            CStr::from_ptr(concat!($lit, "\0").as_ptr() as *const c_char)
+        }
+    }
+}
 
 lazy_static! {
     static ref CHANNEL: Mutex<Option<mpsc::Sender<Message>>> = Mutex::new(None);
@@ -44,17 +50,8 @@ pub enum JsepKind {
     Answer { sdp: String },
 }
 
-const METADATA: janus_plugin::PluginMetadata = janus_plugin::PluginMetadata {
-    version: 1,
-    version_str: cstr!("0.1"),
-    description: cstr!("EchoTest plugin"),
-    name: cstr!("EchoTest plugin"),
-    author: cstr!("Aleksey Ivanov"),
-    package: cstr!("janus.plugin.echotest"),
-};
-
 extern "C" fn init(callback: *mut PluginCallbacks, _config_path: *const c_char) -> c_int {
-    janus_plugin::log(janus_plugin::LogLevel::Verb, "--> janus_echotest_init!!!");
+    janus_verb!("--> janus_echotest_init!!!");
 
     unsafe {
         let callback = callback.as_ref().unwrap();
@@ -72,17 +69,11 @@ extern "C" fn init(callback: *mut PluginCallbacks, _config_path: *const c_char) 
 }
 
 extern "C" fn destroy() {
-    janus_plugin::log(
-        janus_plugin::LogLevel::Verb,
-        "--> janus_echotest_destroy!!!",
-    );
+    janus_verb!("--> janus_echotest_destroy!!!");
 }
 
 extern "C" fn create_session(handle: *mut PluginSession, _error: *mut c_int) {
-    janus_plugin::log(
-        janus_plugin::LogLevel::Verb,
-        "--> janus_echotest_create_session!!!",
-    );
+    janus_verb!("--> janus_echotest_create_session!!!");
 
     let handle = unsafe { &mut *handle };
     let mut session = Box::new(EchoTestSession { field: 11 });
@@ -92,18 +83,12 @@ extern "C" fn create_session(handle: *mut PluginSession, _error: *mut c_int) {
 }
 
 extern "C" fn query_session(_handle: *mut PluginSession) -> *mut RawJanssonValue {
-    janus_plugin::log(
-        janus_plugin::LogLevel::Verb,
-        "--> janus_echotest_query_session!!!",
-    );
+    janus_verb!("--> janus_echotest_query_session!!!");
     std::ptr::null_mut()
 }
 
 extern "C" fn destroy_session(_handle: *mut PluginSession, _error: *mut c_int) {
-    janus_plugin::log(
-        janus_plugin::LogLevel::Verb,
-        "--> janus_echotest_destroy_session!!!",
-    );
+    janus_verb!("--> janus_echotest_destroy_session!!!");
 }
 
 extern "C" fn handle_message(
@@ -112,20 +97,17 @@ extern "C" fn handle_message(
     message: *mut RawJanssonValue,
     jsep: *mut RawJanssonValue,
 ) -> *mut RawPluginResult {
-    janus_plugin::log(
-        janus_plugin::LogLevel::Verb,
-        "--> janus_echotest_handle_message!!!",
-    );
+    janus_verb!("--> janus_echotest_handle_message!!!");
 
     let _session: &EchoTestSession = unsafe {
         let handle_ref = handle.as_ref().unwrap();
         (handle_ref.plugin_handle as *mut EchoTestSession).as_ref()
     }.unwrap();
 
-    janus_plugin::log(janus_plugin::LogLevel::Verb, "--> acquiring transfer lock");
+    janus_verb!("--> acquiring transfer lock");
     let mutex = CHANNEL.lock().unwrap();
     let tx = mutex.as_ref().unwrap();
-    janus_plugin::log(janus_plugin::LogLevel::Verb, "--> acquired transfer lock");
+    janus_verb!("--> acquired transfer lock");
 
     let message = unsafe { JanssonValue::new(message) };
     let jsep = unsafe { JanssonValue::new(jsep) };
@@ -136,33 +118,20 @@ extern "C" fn handle_message(
         message: message,
         jsep: jsep,
     };
-    janus_plugin::log(
-        janus_plugin::LogLevel::Verb,
-        "--> sending message to channel",
-    );
+    janus_verb!("--> sending message to channel");
     tx.send(echo_message)
         .expect("Sending to channel has failed");
 
-    let result = PluginResult::new(
-        PluginResultType::JANUS_PLUGIN_OK_WAIT,
-        cstr!("Rust string"),
-        None,
-    );
+    let result = PluginResult::ok_wait(Some(c_str!("Rust string")));
     result.into_raw()
 }
 
 extern "C" fn setup_media(_handle: *mut PluginSession) {
-    janus_plugin::log(
-        janus_plugin::LogLevel::Verb,
-        "--> janus_echotest_setup_media!!!",
-    );
+    janus_verb!("--> janus_echotest_setup_media!!!");
 }
 
 extern "C" fn hangup_media(_handle: *mut PluginSession) {
-    janus_plugin::log(
-        janus_plugin::LogLevel::Verb,
-        "--> janus_echotest_hangup_media!!!",
-    );
+    janus_verb!("--> janus_echotest_hangup_media!!!");
 }
 
 extern "C" fn incoming_rtp(handle: *mut PluginSession, video: c_int, buf: *mut c_char, len: c_int) {
@@ -183,43 +152,28 @@ extern "C" fn incoming_data(_handle: *mut PluginSession, _buf: *mut c_char, _len
 extern "C" fn slow_link(_handle: *mut PluginSession, _uplink: c_int, _video: c_int) {}
 
 fn janus_echotest_handler(rx: mpsc::Receiver<Message>) {
-    janus_plugin::log(janus_plugin::LogLevel::Verb, "Start handling thread");
+    janus_verb!("Start handling thread");
 
     for received in rx.iter() {
-        janus_plugin::log(
-            janus_plugin::LogLevel::Verb,
-            &format!("--> janus_echotest_handler, received: {:?}", received),
-        );
+        janus_verb!("--> janus_echotest_handler, received: {:?}", received);
 
         if received.jsep.is_none() {
-            janus_plugin::log(
-                janus_plugin::LogLevel::Verb,
-                "--> janus_echotest_handler, jsep is NONE, skipping",
-            );
+            janus_verb!("--> janus_echotest_handler, jsep is NONE, skipping");
             continue;
         }
 
         let jsep: JanssonValue = received.jsep.unwrap();
         let jsep_string: String = jsep.to_string(janus_plugin::JanssonEncodingFlags::empty());
         let jsep_json: JsepKind = serde_json::from_str(&jsep_string).unwrap();
-        janus_plugin::log(
-            janus_plugin::LogLevel::Verb,
-            &format!("--> janus_echotest_handler, jsep: {:?}", jsep_json),
-        );
+        janus_verb!("--> janus_echotest_handler, jsep: {:?}", jsep_json);
 
         let answer: serde_json::Value = match jsep_json {
             JsepKind::Offer { sdp } => {
-                let offer: sdp::Sdp = sdp::Sdp::parse(CString::new(sdp).unwrap()).unwrap();
-                janus_plugin::log(
-                    janus_plugin::LogLevel::Verb,
-                    &format!("--> janus_echotest_handler, offer: {:?}", offer),
-                );
+                let offer: sdp::Sdp = sdp::Sdp::parse(&CString::new(sdp).unwrap()).unwrap();
+                janus_verb!("--> janus_echotest_handler, offer: {:?}", offer);
 
                 let answer: sdp::Sdp = answer_sdp!(offer);
-                janus_plugin::log(
-                    janus_plugin::LogLevel::Verb,
-                    &format!("--> janus_echotest_handler, answer: {:?}", answer),
-                );
+                janus_verb!("--> janus_echotest_handler, answer: {:?}", answer);
 
                 let answer_str = answer.to_string();
                 let sdp = answer_str.to_str().unwrap().to_owned();
@@ -230,13 +184,13 @@ fn janus_echotest_handler(rx: mpsc::Receiver<Message>) {
         };
 
         let event_json = json!({ "result": "ok" });
-        let event_serde: JanssonValue = JanssonValue::from_str(
+        let mut event_serde: JanssonValue = JanssonValue::from_str(
             &event_json.to_string(),
             janus_plugin::JanssonDecodingFlags::empty(),
         ).unwrap();
         let event: *mut RawJanssonValue = event_serde.as_mut_ref();
 
-        let jsep_serde: JanssonValue = JanssonValue::from_str(
+        let mut jsep_serde: JanssonValue = JanssonValue::from_str(
             &answer.to_string(),
             janus_plugin::JanssonDecodingFlags::empty(),
         ).unwrap();
@@ -258,7 +212,14 @@ fn acquire_gateway() -> &'static PluginCallbacks {
 }
 
 const PLUGIN: janus_plugin::Plugin = build_plugin!(
-    METADATA,
+    janus_plugin::PluginMetadata {
+        version: 1,
+        version_str: c_str!("0.1"),
+        description: c_str!("EchoTest plugin"),
+        name: c_str!("EchoTest plugin"),
+        author: c_str!("Aleksey Ivanov"),
+        package: c_str!("janus.plugin.echotest"),
+    },
     init,
     destroy,
     create_session,
