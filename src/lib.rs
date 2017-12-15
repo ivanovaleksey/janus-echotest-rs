@@ -9,12 +9,12 @@ extern crate serde_derive;
 #[macro_use]
 extern crate serde_json;
 
-use std::os::raw::{c_int, c_char, c_void};
-use std::sync::{Mutex, RwLock, mpsc};
-use std::ffi::CString;
-use janus_plugin::{PluginCallbacks, PluginSession, RawPluginResult, PluginResult,
-                   PluginResultType, RawJanssonValue, JanssonValue};
+use janus_plugin::{JanssonValue, PluginCallbacks, PluginResult, PluginResultType, PluginSession,
+                   RawJanssonValue, RawPluginResult};
 use janus_plugin::sdp;
+use std::ffi::CString;
+use std::os::raw::{c_char, c_int, c_void};
+use std::sync::{mpsc, Mutex, RwLock};
 
 lazy_static! {
     static ref CHANNEL: Mutex<Option<mpsc::Sender<Message>>> = Mutex::new(None);
@@ -64,7 +64,9 @@ extern "C" fn init(callback: *mut PluginCallbacks, _config_path: *const c_char) 
     let (tx, rx) = mpsc::channel();
     *(CHANNEL.lock().unwrap()) = Some(tx);
 
-    std::thread::spawn(move || { janus_echotest_handler(rx); });
+    std::thread::spawn(move || {
+        janus_echotest_handler(rx);
+    });
 
     0
 }
@@ -110,7 +112,6 @@ extern "C" fn handle_message(
     message: *mut RawJanssonValue,
     jsep: *mut RawJanssonValue,
 ) -> *mut RawPluginResult {
-
     janus_plugin::log(
         janus_plugin::LogLevel::Verb,
         "--> janus_echotest_handle_message!!!",
@@ -139,9 +140,8 @@ extern "C" fn handle_message(
         janus_plugin::LogLevel::Verb,
         "--> sending message to channel",
     );
-    tx.send(echo_message).expect(
-        "Sending to channel has failed",
-    );
+    tx.send(echo_message)
+        .expect("Sending to channel has failed");
 
     let result = PluginResult::new(
         PluginResultType::JANUS_PLUGIN_OK_WAIT,
