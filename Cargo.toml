@@ -7,7 +7,7 @@ authors = ["Aleksey Ivanov <ialexxei@gmail.com>"]
 crate-type = ["rlib", "cdylib"]
 
 [dependencies]
-janus-plugin = "0.7.0"
+janus-plugin = "0.7.1"
 lazy_static = "*"
 serde = "1.0"
 serde_derive = "1.0"
