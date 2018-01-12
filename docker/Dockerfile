@@ -25,7 +25,6 @@ RUN set -xe \
         automake \
         gdb \
         gengetopt \
-        libwebsockets-dev \
         libmicrohttpd-dev \
         libnice-dev \
         libssl-dev \
@@ -60,12 +59,26 @@ RUN set -xe \
         && make -j $(nproc) \
         && make install \
         && rm -fr "${USRSCTP_BUILD_DIR}" \
+    && cd /tmp \
+        && curl -fsSL -o cmake.tar.gz  "https://cmake.org/files/v3.9/cmake-3.9.6-Linux-x86_64.tar.gz" \
+        && mkdir cmake-3.9.6 \
+        && tar xf cmake.tar.gz -C cmake-3.9.6 --strip-components=1 \
+        && mv cmake-3.9.6 /opt \
+    && WEBSOCKETS_BUILD_DIR='/tmp/libwebsockets' \
+    && mkdir "${WEBSOCKETS_BUILD_DIR}" \
+    && cd "${WEBSOCKETS_BUILD_DIR}" \
+        && git clone https://github.com/warmcat/libwebsockets.git . \
+        && mkdir build \
+        && cd build \
+        && /opt/cmake-3.9.6/bin/cmake -DLWS_MAX_SMP=1 -DCMAKE_INSTALL_PREFIX:PATH=/usr -DCMAKE_C_FLAGS="-fpic" .. \
+        && make \
+        && make install \
     && JANUS_BUILD_DIR='/tmp/janus' \
     && mkdir "${JANUS_BUILD_DIR}" \
     && cd "${JANUS_BUILD_DIR}" \
         && git clone https://github.com/meetecho/janus-gateway.git . \
         && ./autogen.sh \
-        && ./configure --prefix=/opt/janus --disable-rabbitmq --disable-mqtt --disable-all-plugins enable_plugin_echotest=yes\
+        && ./configure --prefix=/opt/janus --enable-websockets --disable-rabbitmq --disable-mqtt --disable-all-plugins enable_plugin_echotest=yes\
         && make || true \
         && make -j $(nproc) \
         && make install \
