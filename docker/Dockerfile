@@ -102,7 +102,8 @@ RUN set -xe \
 ## -----------------------------------------------------------------------------
 RUN set -xe \
     && perl -pi -e 's/(http = ).*/${1}no/' /opt/janus/etc/janus/janus.transport.http.cfg \
-    && perl -pi -e 's/(https = ).*/${1}yes/' /opt/janus/etc/janus/janus.transport.http.cfg
+    && perl -pi -e 's/(https = ).*/${1}yes/' /opt/janus/etc/janus/janus.transport.http.cfg \
+    && perl -pi -e 's/(wss = ).*/${1}yes/' /opt/janus/etc/janus/janus.transport.websockets.cfg
 
 ## -----------------------------------------------------------------------------
 ## Configuring Janus Examples
