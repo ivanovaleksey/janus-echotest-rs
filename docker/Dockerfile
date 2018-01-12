@@ -77,6 +77,7 @@ RUN set -xe \
     && mkdir "${JANUS_BUILD_DIR}" \
     && cd "${JANUS_BUILD_DIR}" \
         && git clone https://github.com/meetecho/janus-gateway.git . \
+        && git checkout -b refcount origin/refcount \
         && ./autogen.sh \
         && ./configure --prefix=/opt/janus --enable-websockets --disable-rabbitmq --disable-mqtt --disable-all-plugins enable_plugin_echotest=yes\
         && make || true \
