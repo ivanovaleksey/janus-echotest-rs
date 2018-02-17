@@ -3,14 +3,10 @@ rust:
   - nightly
 cache: cargo
 before_install:
-  - ls -l $HOME/.cargo/bin
-  - rm -f /home/travis/.cargo/bin/rustfmt
-  - sudo apt-get -qq update
-  - sudo apt-get install -y libjansson-dev
 before_script:
   - rustup component add rustfmt-preview
-  - which rustfmt || cargo install -f rustfmt-nightly
 script:
+  - cargo fmt -- --version
   - cargo fmt -- --write-mode=diff
   - cargo build
   - cargo test
