@@ -25,6 +25,7 @@ RUN set -xe \
         automake \
         gdb \
         gengetopt \
+        libconfig-dev \
         libmicrohttpd-dev \
         libnice-dev \
         libssl-dev \
